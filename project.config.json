@@ -7,7 +7,7 @@
     "minified": false
   },
   "compileType": "miniprogram",
-  "appid": "",
+  "appid": "wx68af10b589d4e4a3",
   "projectname": "wepywechat",
   "miniprogramRoot": "./dist"
 }
