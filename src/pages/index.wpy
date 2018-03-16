@@ -1,0 +1,172 @@
+<style lang="less">
+  .pmWrap{
+    padding:0 18px;
+    box-sizing: border-box;
+    div{
+      display: block;
+      text-align: left;
+      font-size:13px;
+    }
+  }
+  .pmtableWrap{
+    margin-top: 10px;
+    margin-bottom: 20px;
+    width:100%;
+    font-size:12px;
+    border-top:1px solid #e7e7e7;    
+    border-left:1px solid #e7e7e7;
+  }
+  .pmtableWrap text{
+    padding:5px 0;
+    border-right: 1px solid #e7e7e7;
+    border-bottom: 1px solid #e7e7e7;
+  }
+  .flex-row{
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items:stretch;
+    vertical-align: middle;
+    text-align: center;
+  }
+  .flex-column{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+  }
+  .flex-cell{
+    flex: 2;
+    &.flex-small{
+      flex:1.5
+    }
+  }
+  .bgShow{
+    width:100%;
+    height:105px;
+    display: block;
+    margin-bottom: 10px;
+  }
+</style>
+<template>
+  <view class="container" wx:if="{{!pm2Data.pm}}">
+    <loading />
+  </view>
+  <view wx:elif="{{pm2Data.pm}}" class="section pmWrap">
+      <image class='bgShow' src='https://dn-mhc.qbox.me/wxpyimg/banner.jpg'/>
+      <div>当前城市：{{pm2Data.pm.area}}</div>
+      <div>发布时间：{{pm2Data.pm.ct}}</div>
+      <div>空气质量指数类别：{{pm2Data.pm.quality}}</div>
+      <div>首要污染物：{{pm2Data.pm.primary_pollutant}}</div>
+      <div>臭氧1小时平均：{{pm2Data.pm.o3}}</div>
+      <div>颗粒物：{{pm2Data.pm.pm10}}</div>
+      <view class="pmtableWrap flex-column">
+        <view class="flex-cell flex-row">
+          <text class="flex-cell flex-row flex-small">区/县</text>
+          <text class="flex-cell flex-row flex-small">AQI</text>
+          <text class="flex-cell flex-row">污染等级</text>
+          <text class="flex-cell flex-row">PM2.5浓度</text>
+          <text class="flex-cell flex-row">PM10浓度</text>
+        </view>
+        <repeat for="{{ pm2Data.siteList }}" key="index" index="index" item="item">
+            <view class="flex-row flex-cell">
+              <text class="flex-cell flex-row flex-small">{{item.site_name || ''}}</text>
+              <text class="flex-cell flex-row flex-small">{{item.aqi || ''}}</text>
+              <text class="flex-cell flex-row">{{item.quality || ''}}</text>
+              <text class="flex-cell flex-row">{{item.pm2_5 || ''}}μg/m3</text>
+              <text class="flex-cell flex-row">{{item.pm10 || ''}}μg/m3</text>
+            </view>
+        </repeat>
+      </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import { connect } from 'wepy-redux'
+  import { getChina, formatterDateTime } from '../utils/tool'
+  import Loading from '../components/loading'
+  @connect({
+    num (state) {
+      return state.counter.num
+    }
+  })
+
+  export default class Index extends wepy.page {
+    config = {
+      navigationBarTitleText: '今日空气质量',
+      enablePullDownRefresh:false
+    }
+    components = {
+      loading:Loading
+    }
+    data = {
+      userInfo: {
+        nickName: '加载中...'
+      },
+      pm2Data:{},
+      animationData: {}
+    }
+
+    computed = {
+      now () {
+        return +new Date()
+      }
+    }
+
+    methods = {
+      
+    }
+
+    actionCommon = {
+      'getPm25':()=>{
+          const showapi_timestamp = formatterDateTime();
+          const { userInfo={} } = this;
+          const { city } = userInfo;
+          const self = this;
+          wepy.request({
+            url: 'https://route.showapi.com/104-29',
+            method:'post',
+            header: {
+                'content-type': 'application/x-www-form-urlencoded' // 默认值
+            },
+            data:{
+                showapi_timestamp,
+                'showapi_sign':'430268d455fb4a8da3210e26c8b83e7d',
+                'showapi_appid':'58885',
+                'city':getChina(city)
+            },
+            success: function (d) {
+              const { data = {} } = d;
+              const { showapi_res_body, showapi_res_code, showapi_res_error } = data;
+              if(!showapi_res_error){
+                  self.pm2Data = showapi_res_body;
+                  self.$apply();
+              }
+            }
+          })
+      }
+    }
+    onHide(){
+      this.pm2Data = {};
+      this.$apply();
+    }
+    onShow() {
+      let self = this
+      const userInfo = this.$parent.getUserInfo();
+      if(userInfo){
+        self.userInfo = userInfo;
+        self.actionCommon.getPm25();
+        self.$apply()
+      }else{
+        this.$parent.getUserInfo(function (userInfo) {
+          if (userInfo) {
+            self.userInfo = userInfo;
+            self.actionCommon.getPm25();
+          }
+          self.$apply()
+        });
+      }
+    }
+  }
+</script>

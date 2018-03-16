@@ -1,0 +1,150 @@
+<style lang="less">
+.pmWrap{
+    padding:0 18px;
+    height: auto;
+    overflow: hidden;
+  }
+  .flex-cell{
+    border-bottom:1px dashed #e7e7e7;
+    padding:5px 0;
+  }
+  .title{
+    font-size:14px;
+    color:#373737;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .time{
+    font-size:12px;
+    color:#999;
+    font-weight: 300;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .text{
+    font-size:12px;
+    color:#999;
+    font-weight: 300;
+  }
+  .btmTxt{
+    height:40px;
+    line-height: 40px;
+    text-align: center;
+    font-size:13px;
+    color:#999;
+  }
+</style>
+<template>
+    <view class="container" wx:if="{{loading}}">
+        <loading/>
+    </view>
+    <view wx:elif="{{!loading}}" class="section pmWrap">
+        <repeat for="{{ guessData }}" key="index" index="index" item="item">
+            <view class="flex-row flex-cell">
+                <Text class='title'>{{ item.typeName }}</Text>
+                <div class='time'>{{ item.title }}</div>
+                <rich-text nodes="<div class='text'>{{item.answer}}</div>"></rich-text>  
+            </view>
+        </repeat>
+    </view>
+    <view wx:if="{{loadMore}}" class="btmTxt">正在加载更多</view>
+    <view wx:if="{{!hasMore}}" class="btmTxt">加载完成</view>
+</template>
+<script>
+    import wepy from 'wepy'
+    import { connect } from 'wepy-redux'
+    import { getChina, formatterDateTime } from '../utils/tool'
+    import Loading from '../components/loading'
+    export default class Me extends wepy.page {
+        config = {
+            navigationBarTitleText: '猜一猜',
+            enablePullDownRefresh:true
+        }
+        components = {
+            loading:Loading
+        }
+        watch = {
+            loadMore (newValue, oldValue) {
+                console.log(`loadMore value: ${oldValue} -> ${newValue}`)
+            }
+        }
+        data = {
+            userInfo: {
+                nickName: '加载中...'
+            },
+            guessData:[],
+            page:1,
+            maxResult:20,
+            loading:true,
+            loadMore:false,
+            hasMore:true,
+            isFirstLoad:true
+        }
+        actionCommon = {
+            'getGuess':()=>{
+                const showapi_timestamp = formatterDateTime();
+                const { userInfo={} } = this;
+                let { page, maxResult, loadMore } = this;
+                const self = this;
+                wepy.request({
+                    url: 'https://route.showapi.com/151-4',
+                    method:'post',
+                    header: {
+                        'content-type': 'application/x-www-form-urlencoded' // 默认值
+                    },
+                    data:{
+                        showapi_timestamp,
+                        'showapi_sign':'430268d455fb4a8da3210e26c8b83e7d',
+                        'showapi_appid':'58885',
+                        'page':page,
+                        'maxResult':maxResult
+                    },
+                    success: function (d) {
+                        const { showapi_res_body={}, showapi_res_code, showapi_res_error } = d.data;
+                        if(!showapi_res_error){
+                            const { pb={} } = showapi_res_body;
+                            self.guessData = self.guessData.concat(pb.contentlist);
+                            if(pb.contentlist.length<self.maxResult){
+                                self.hasMore=false;
+                            }
+                        };
+                        self.loading = false;
+                        self.loadMore = false;
+                        self.$apply();
+                    },
+                    complete:function(){
+                        wx.stopPullDownRefresh();
+                        wx.hideNavigationBarLoading();
+                        self.isFirstLoad = true;
+                        self.$apply();
+                    }
+                })
+            }
+        }
+        onHide(){
+            this.loading = true;
+            this.$apply();
+        }
+        onPullDownRefresh(){
+            wx.showNavigationBarLoading();
+            this.actionCommon.getGuess();
+        }
+        onReachBottom(){
+            if(this.hasMore && this.isFirstLoad){
+                this.page = this.page+1;
+                this.loadMore = true;
+                this.isFirstLoad=false;
+                this.$apply();
+                this.actionCommon.getGuess();
+            }
+        }
+        onShow(){
+            let self = this
+            const userInfo = this.$parent.getUserInfo();
+            if(userInfo){
+                this.actionCommon.getGuess();
+            }
+        }
+    }
+</script>
