@@ -60,3 +60,10 @@
     <div class="rect5"></div>
   </div>
 </template>
+
+<script>
+  import wepy from 'wepy'
+
+  export default class Loading extends wepy.component {
+  }
+</script>
